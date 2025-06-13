@@ -58,12 +58,18 @@ jobs:
             echo "stable=$stable"
           } >> "$GITHUB_OUTPUT"
 
-  echo-vars:
+  deploy:
     runs-on: ubuntu-latest
     needs: setup-vars
     steps:
-       - name: Echo outputs from setup-vars
-         run: |
-          echo "Preview: ${{ needs.setup-vars.outputs.preview }}"
-          echo "Unstable: ${{ needs.setup-vars.outputs.unstable }}"
-          echo "Stable: ${{ needs.setup-vars.outputs.stable }}"
+      - name: deploy-preview
+        if: needs.setup-vars.outputs.preview == 'true'
+        run: echo "Preview is enabled"
+
+      - name: deploy-unstable
+        if: needs.setup-vars.outputs.unstable == 'true'
+        run: echo "Unstable is enabled"
+
+      - name: deploy-stable
+        if: needs.setup-vars.outputs.stable == 'true'
+        run: echo "Stable is enabled"
