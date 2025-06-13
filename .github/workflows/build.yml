@@ -1,0 +1,69 @@
+name: gha event demo
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - synchronize
+      - labeled
+
+jobs:
+  setup-vars:
+    runs-on: ubuntu-latest
+    outputs:
+      preview: ${{ steps.setup-vars.outputs.preview }}
+      unstable: ${{ steps.setup-vars.outputs.unstable }}
+      stable: ${{ steps.setup-vars.outputs.stable }}
+    steps:
+      - name: setup vars
+        id: setup-vars
+        run: |
+          echo "==> Setting variables from github event context..."
+
+          unstable="false"
+          preview="false"
+          stable="false"
+
+          if [[ "${GITHUB_REF}" == "refs/heads/main" ]]; then
+
+            echo "On main branch. Setting stable=true"
+            stable="true"
+
+          elif [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
+
+            echo "Pull request event"
+            labels=$(jq -r '.pull_request.labels[].name' "$GITHUB_EVENT_PATH")
+
+            # set preview=true only if 'preview' label exists and 'unstable' label does not
+            # unstable superscedes preview when both are present
+            if grep -q "^preview$" <<<"$labels" && ! grep -q "^unstable$" <<<"$labels"; then
+                echo "Label 'preview' found and 'unstable' label NOT found. Setting preview=true"
+                preview="true"
+            fi
+
+            if grep -q "^unstable$" <<<"$labels"; then
+                echo "Label 'preview' found. Setting unstable=true"
+                unstable="true"
+            fi
+          fi
+
+          {
+            echo "preview=$preview"
+            echo "unstable=$unstable"
+            echo "stable=$stable"
+          } >> "$GITHUB_OUTPUT"
+
+  echo-vars:
+    runs-on: ubuntu-latest
+    needs: setup-vars
+    steps:
+       - name: Echo outputs from setup-vars
+         run: |
+          echo "Preview: ${{ needs.setup-vars.outputs.preview }}"
+          echo "Unstable: ${{ needs.setup-vars.outputs.unstable }}"
+          echo "Stable: ${{ needs.setup-vars.outputs.stable }}"
