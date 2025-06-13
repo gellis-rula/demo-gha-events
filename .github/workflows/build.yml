@@ -70,7 +70,7 @@ jobs:
         with:
           script: |
             github.rest.issues.createComment({
-              issue_number: context.issue.number,
+              issue_number: context.payload.pull_request?.number,
               owner: context.repo.owner,
               repo: context.repo.name,
               body: "Preview deployment has been triggered. ⛵"
@@ -89,7 +89,7 @@ jobs:
         with:
           script: |
             github.rest.issues.createComment({
-              issue_number: context.issue.number,
+              issue_number: context.payload.pull_request?.number,
               owner: context.repo.owner,
               repo: context.repo.name,
               body: "Unstable deployment has been triggered. ⛵"
