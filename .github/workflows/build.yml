@@ -72,11 +72,20 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
+            const sha = context.payload.pull_request?.head?.sha?.substring(0, 7) || context.sha.substring(0, 7);
+            const actor = context.actor;
+            const message = `
+            ### ⛵ Preview Deployment Triggered
+
+            Pipeline Execution: 
+            Commit: ${sha}
+            Triggered by: ${actor}`;
+
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: "Preview deployment has been triggered. ⛵"
+              body: message
             })
 
   deploy-unstable:
@@ -94,11 +103,20 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
+            const sha = context.payload.pull_request?.head?.sha?.substring(0, 7) || context.sha.substring(0, 7);
+            const actor = context.actor;
+            const message = `
+            ### ⛵ Unstable Deployment Triggered
+
+            Pipeline Execution:
+            Commit: ${sha}
+            Triggered by: ${actor}`;
+
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: "Unstable deployment has been triggered. ⛵"
+              body: message
             })
 
   deploy-stable:
