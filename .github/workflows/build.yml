@@ -1,0 +1,129 @@
+name: gha event demo
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - synchronize
+      - labeled
+
+jobs:
+  setup-vars:
+    runs-on: ubuntu-latest
+    outputs:
+      preview: ${{ steps.setup-vars.outputs.preview }}
+      unstable: ${{ steps.setup-vars.outputs.unstable }}
+      stable: ${{ steps.setup-vars.outputs.stable }}
+    steps:
+      - name: setup vars
+        id: setup-vars
+        run: |
+          echo "==> Setting variables from github event context..."
+
+          unstable="false"
+          preview="false"
+          stable="false"
+
+          if [[ "${GITHUB_REF}" == "refs/heads/main" ]]; then
+
+            echo "On main branch. Setting stable=true"
+            stable="true"
+
+          elif [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
+
+            echo "Pull request event"
+            labels=$(jq -r '.pull_request.labels[].name' "$GITHUB_EVENT_PATH")
+
+            # set preview=true only if 'preview' label exists and 'unstable' label does not
+            # unstable superscedes preview when both are present
+            if grep -q "^preview$" <<<"$labels" && ! grep -q "^unstable$" <<<"$labels"; then
+                echo "Label 'preview' found and 'unstable' label NOT found. Setting preview=true"
+                preview="true"
+            fi
+
+            if grep -q "^unstable$" <<<"$labels"; then
+                echo "Label 'preview' found. Setting unstable=true"
+                unstable="true"
+            fi
+          fi
+
+          {
+            echo "preview=$preview"
+            echo "unstable=$unstable"
+            echo "stable=$stable"
+          } >> "$GITHUB_OUTPUT"
+
+  deploy-preview:
+    runs-on: ubuntu-latest
+    needs: setup-vars
+    if: needs.setup-vars.outputs.preview == 'true'
+    permissions:
+      pull-requests: write
+    steps:
+      - name: deploy-preview
+        run: echo "Preview is enabled"
+      - name: notify
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const sha = context.payload.pull_request?.head?.sha?.substring(0, 7) || context.sha.substring(0, 7);
+            const actor = context.actor;
+            const message = `
+            ### ⛵ Preview Deployment Triggered
+
+            Pipeline Execution: 
+            Commit: ${sha}
+            Triggered by: ${actor}`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: message
+            })
+
+  deploy-unstable:
+    runs-on: ubuntu-latest
+    needs: setup-vars
+    if: needs.setup-vars.outputs.unstable == 'true'
+    permissions:
+      pull-requests: write
+    steps:
+      - name: deploy-unstable
+        if: needs.setup-vars.outputs.unstable == 'true'
+        run: echo "Unstable is enabled"
+      - name: notify
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const sha = context.payload.pull_request?.head?.sha?.substring(0, 7) || context.sha.substring(0, 7);
+            const actor = context.actor;
+            const message = `
+            ### ⛵ Unstable Deployment Triggered
+
+            Pipeline Execution:
+            Commit: ${sha}
+            Triggered by: ${actor}`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: message
+            })
+
+  deploy-stable:
+    runs-on: ubuntu-latest
+    needs: setup-vars
+    if: needs.setup-vars.outputs.stable == 'true'
+    steps:
+      - name: deploy-stable
+        if: needs.setup-vars.outputs.stable == 'true'
+        run: echo "Stable is enabled"
