@@ -20,19 +20,74 @@ jobs:
       unstable: ${{ steps.setup-vars.outputs.unstable }}
       stable: ${{ steps.setup-vars.outputs.stable }}
     steps:
+      - uses: actions/checkout@v4
       - name: setup vars
         id: setup-vars
+        env:
+          GITHUB_BEFORE: "${{ github.event.before }}"
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "==> Setting variables from github event context..."
+
+          config_only="false"
 
           unstable="false"
           preview="false"
           stable="false"
 
+          github_base_ref=$(gh api repos/${{ github.repository }}/commits/main --jq '.sha')
+          config_pattern='^(terraform/)'
+          config_ignore='(.github|scripts|scripts-ext)'
+
+
+          config_only(){
+          # return true when only app config has changed
+            local github_base_ref="$1"
+            local pattern="$2"
+            local ignore="$3"
+
+            git fetch origin "$github_base_ref"
+
+            local _files
+            _files="$(git diff --name-only "${github_base_ref}" HEAD)"
+            local files
+            files="$(grep -vE "$ignore" <<<"${FILES:-$_files}")"
+
+            local changed_config="false"
+            local changed_artifact="false"
+            local config_only="false"
+
+            if [[ -z "$files" ]]; then
+              echo "$config_only"
+             return
+            fi
+
+            if grep -qvE "$pattern" <<<"$files"; then
+              echo "matched artifact build changes." >&2
+              changed_artifact="true"
+            fi
+
+            if grep -qE "$pattern" <<<"$files"; then
+              echo "matched config changes." >&2
+              changed_config="true"
+            fi
+
+            if [[ "$changed_artifact" == "false" ]] && [[ "$changed_config" == "true" ]]; then
+              config_only="true"
+            fi
+
+            echo "$config_only"
+          }
+
+
           if [[ "${GITHUB_REF}" == "refs/heads/main" ]]; then
 
-            echo "On main branch. Setting stable=true"
+            echo "On main branch."
+            echo "Setting stable=true"
             stable="true"
+
+            echo "Setting base ref to $GITHUB_BEFORE"
+            github_base_ref="$GITHUB_BEFORE"
 
           elif [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
 
@@ -50,9 +105,22 @@ jobs:
                 echo "Label 'preview' found. Setting unstable=true"
                 unstable="true"
             fi
+
+            
+            echo "Setting base ref to ${{ github.base_ref }}"
+            github_base_ref=$(gh api repos/${{ github.repository }}/commits/${{ github.base_ref }} --jq '.sha')
           fi
 
+
+          config_only="$(config_only "$github_base_ref" "$config_pattern" "$config_ignore")"
+
+          echo "config_only=$config_only"
+          echo "preview=$preview"
+          echo "unstable=$unstable"
+          echo "stable=$stable"
+
           {
+            echo "config_only=$config_only"
             echo "preview=$preview"
             echo "unstable=$unstable"
             echo "stable=$stable"
