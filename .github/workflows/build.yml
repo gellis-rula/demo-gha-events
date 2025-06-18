@@ -36,7 +36,7 @@ jobs:
           stable="false"
 
           github_base_ref=$(gh api repos/${{ github.repository }}/commits/main --jq '.sha')
-          config_pattern='^(terraform/)'
+          config_pattern='^(k8s/helm-values/)'
           config_ignore='(.github|scripts|scripts-ext)'
 
 
