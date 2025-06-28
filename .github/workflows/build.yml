@@ -205,7 +205,10 @@ jobs:
   deploy-preview:
     runs-on: ubuntu-latest
     needs: setup-vars
-    if: needs.setup-vars.outputs.preview == 'true'
+    if: needs.setup-vars.outputs.preview == 'true' && (
+          needs.setup-vars.outputs.config_only != 'true'
+          || needs.setup-vars.outputs.config_preview == 'true'
+        )
     permissions:
       pull-requests: write
     steps:
@@ -235,7 +238,10 @@ jobs:
   deploy-unstable:
     runs-on: ubuntu-latest
     needs: setup-vars
-    if: needs.setup-vars.outputs.unstable == 'true'
+    if: needs.setup-vars.outputs.unstable == 'true' && (
+          needs.setup-vars.outputs.config_only != 'true'
+          || needs.setup-vars.outputs.config_dev == 'true'
+        )
     permissions:
       pull-requests: write
     steps:
