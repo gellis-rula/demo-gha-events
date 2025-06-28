@@ -19,6 +19,11 @@ jobs:
       preview: ${{ steps.setup-vars.outputs.preview }}
       unstable: ${{ steps.setup-vars.outputs.unstable }}
       stable: ${{ steps.setup-vars.outputs.stable }}
+      config_only: ${{ steps.setup-vars.outputs.config_only }}
+      config_preview: ${{ steps.setup-vars.outputs.config_preview }}
+      config_dev: ${{ steps.setup-vars.outputs.config_dev }}
+      config_prod: ${{ steps.setup-vars.outputs.config_prod }}
+      config_stable: ${{ steps.setup-vars.outputs.config_stable }}
     steps:
       - uses: actions/checkout@v4
       - name: setup vars
@@ -261,7 +266,7 @@ jobs:
   deploy-stable:
     runs-on: ubuntu-latest
     needs: setup-vars
-    if: needs.setup-vars.outputs.stable == 'true'
+    if: needs.setup-vars.outputs.stable == 'true' && needs.setup-vars.outputs.config_only != 'true'
     steps:
       - name: deploy-stable
         if: needs.setup-vars.outputs.stable == 'true'
