@@ -29,15 +29,52 @@ jobs:
         run: |
           echo "==> Setting variables from github event context..."
 
-          config_only="false"
-
+          # initialize flags
           unstable="false"
           preview="false"
           stable="false"
 
-          github_base_ref=$(gh api repos/${{ github.repository }}/commits/main --jq '.sha')
+          config_only="false"
+          config_preview="false"
+          config_dev="false"
+          config_prod="false"
+          config_stable="false"
+
+          # patterns to match config files
           config_pattern='^(k8s/helm-values/)'
           config_ignore='(.github|scripts|scripts-ext)'
+
+          # get base ref for main or PR
+          if [[ "${GITHUB_REF}" == "refs/heads/main" ]]; then
+
+            echo "On main branch."
+            echo "Setting stable=true"
+            stable="true"
+
+            echo "Setting base ref to $GITHUB_BEFORE"
+            github_base_ref="$GITHUB_BEFORE"
+
+          elif [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
+
+            echo "Pull request event"
+            labels=$(jq -r '.pull_request.labels[].name' "$GITHUB_EVENT_PATH")
+
+            # set preview=true only if 'preview' label exists and 'unstable' label does not
+            # unstable superscedes preview when both are present
+            if grep -q "^preview$" <<<"$labels" && ! grep -q "^unstable$" <<<"$labels"; then
+                echo "Label 'preview' found and 'unstable' label NOT found. Setting preview=true"
+                preview="true"
+            fi
+
+            if grep -q "^unstable$" <<<"$labels"; then
+                echo "Label 'preview' found. Setting unstable=true"
+                unstable="true"
+            fi
+
+
+            echo "Setting base ref to ${{ github.base_ref }}"
+            github_base_ref=$(gh api repos/${{ github.repository }}/commits/${{ github.base_ref }} --jq '.sha')
+          fi
 
 
           config_only(){
@@ -79,48 +116,80 @@ jobs:
             echo "$config_only"
           }
 
+          detect_config_env_changes(){
+          # return true when only app config has changed
+            local github_base_ref="$1"
+            local pattern="$2"
+            local ignore="$3"
 
-          if [[ "${GITHUB_REF}" == "refs/heads/main" ]]; then
+            local _files files
+            _files="$(git diff --name-only "${github_base_ref}" HEAD)"
+            files="$(grep -vE "$config_ignore" <<<"${FILES:-$_files}")"
 
-            echo "On main branch."
-            echo "Setting stable=true"
-            stable="true"
 
-            echo "Setting base ref to $GITHUB_BEFORE"
-            github_base_ref="$GITHUB_BEFORE"
+            config_only="$(config_only "$github_base_ref" "$config_pattern" "$config_ignore")"
+            # Reset output flags
+            config_preview="false"
+            config_dev="false"
+            config_prod="false"
+            config_stable="false"
 
-          elif [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
 
-            echo "Pull request event"
-            labels=$(jq -r '.pull_request.labels[].name' "$GITHUB_EVENT_PATH")
-
-            # set preview=true only if 'preview' label exists and 'unstable' label does not
-            # unstable superscedes preview when both are present
-            if grep -q "^preview$" <<<"$labels" && ! grep -q "^unstable$" <<<"$labels"; then
-                echo "Label 'preview' found and 'unstable' label NOT found. Setting preview=true"
-                preview="true"
+            if [[ "$config_only" != "true" ]]; then
+              return
             fi
 
-            if grep -q "^unstable$" <<<"$labels"; then
-                echo "Label 'preview' found. Setting unstable=true"
-                unstable="true"
+            # Directly check if each env was updated
+            local preview_updated dev_updated prod_updated
+            preview_updated="false"
+            dev_updated="false"
+            prod_updated="false"
+
+            if grep -qE "${pattern}.*preview" <<<"$files"; then
+              preview_updated="true"
+            fi
+            if grep -qE "${pattern}.*dev" <<<"$files"; then
+              dev_updated="true"
+            fi
+            if grep -qE "${pattern}.*prod" <<<"$files"; then
+              prod_updated="true"
             fi
 
-            
-            echo "Setting base ref to ${{ github.base_ref }}"
-            github_base_ref=$(gh api repos/${{ github.repository }}/commits/${{ github.base_ref }} --jq '.sha')
-          fi
+            # Apply business rules for outputs
+            if [[ "$preview" == "true" && "$preview_updated" == "true" ]]; then
+              config_preview="true"
+            fi
+            if { [[ "$unstable" == "true" && "$dev_updated" == "true" ]] || [[ "$stable" == "true" && "$dev_updated" == "true" ]]; }; then
+              config_dev="true"
+            fi
+            if [[ "$stable" == "true" && "$prod_updated" == "true" ]]; then
+              config_prod="true"
+            fi
+            if [[ "$stable" == "true" && "$dev_updated" == "true" && "$prod_updated" == "true" ]]; then
+              config_stable="true"
+            fi
+          }
 
 
-          config_only="$(config_only "$github_base_ref" "$config_pattern" "$config_ignore")"
+          detect_config_env_changes "$github_base_ref" "$config_pattern" "$config_ignore"
 
+
+          # --- Output summary ---
           echo "config_only=$config_only"
+          echo "config_preview=$config_preview"
+          echo "config_dev=$config_dev"
+          echo "config_prod=$config_prod"
+          echo "config_stable=$config_stable"
           echo "preview=$preview"
           echo "unstable=$unstable"
           echo "stable=$stable"
 
           {
             echo "config_only=$config_only"
+            echo "config_preview=$config_preview"
+            echo "config_dev=$config_dev"
+            echo "config_prod=$config_prod"
+            echo "config_stable=$config_stable"
             echo "preview=$preview"
             echo "unstable=$unstable"
             echo "stable=$stable"
