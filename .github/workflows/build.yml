@@ -28,7 +28,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "==> Setting variables from github event context..."
-
+          set -x
           # initialize flags
           unstable="false"
           preview="false"
@@ -121,6 +121,8 @@ jobs:
             local github_base_ref="$1"
             local pattern="$2"
             local ignore="$3"
+
+            git fetch origin "$github_base_ref"
 
             local _files files
             _files="$(git diff --name-only "${github_base_ref}" HEAD)"
