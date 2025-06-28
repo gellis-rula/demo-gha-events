@@ -272,7 +272,10 @@ jobs:
   deploy-stable:
     runs-on: ubuntu-latest
     needs: setup-vars
-    if: needs.setup-vars.outputs.stable == 'true' && needs.setup-vars.outputs.config_only != 'true'
+    if: needs.setup-vars.outputs.stable == 'true' && (
+          needs.setup-vars.outputs.config_only != 'true' ||
+          needs.setup-vars.outputs.config_stable == 'true'
+        )
     steps:
       - name: deploy-stable
         if: needs.setup-vars.outputs.stable == 'true'
