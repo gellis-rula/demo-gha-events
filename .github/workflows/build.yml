@@ -16,18 +16,22 @@ jobs:
   setup-vars:
     runs-on: ubuntu-latest
     outputs:
-      preview: ${{ steps.setup-vars.outputs.preview }}
-      unstable: ${{ steps.setup-vars.outputs.unstable }}
-      stable: ${{ steps.setup-vars.outputs.stable }}
-      config_only: ${{ steps.setup-vars.outputs.config_only }}
-      config_preview: ${{ steps.setup-vars.outputs.config_preview }}
-      config_dev: ${{ steps.setup-vars.outputs.config_dev }}
-      config_prod: ${{ steps.setup-vars.outputs.config_prod }}
-      config_stable: ${{ steps.setup-vars.outputs.config_stable }}
+      preview: ${{ steps.control-flow.outputs.preview }}
+      unstable: ${{ steps.control-flow.outputs.unstable }}
+      stable: ${{ steps.control-flow.outputs.stable }}
+      config_only: ${{ steps.control-flow.outputs.config_only }}
+      config_preview: ${{ steps.control-flow.outputs.config_preview }}
+      config_dev: ${{ steps.control-flow.outputs.config_dev }}
+      config_prod: ${{ steps.control-flow.outputs.config_prod }}
+      config_stable: ${{ steps.control-flow.outputs.config_stable }}
+      artifact_tag_dev: ${{ steps.setup-artifact-tags.outputs.artifact_tag_dev }}
+      artifact_tag_prod: ${{ steps.setup-artifact-tags.outputs.artifact_tag_prod }}
+      artifact_tag_preview: ${{ steps.setup-artifact-tags.outputs.artifact_tag_preview }}
+
     steps:
       - uses: actions/checkout@v4
-      - name: setup vars
-        id: setup-vars
+      - name: setup control flow outputs
+        id: control-flow
         env:
           GITHUB_BEFORE: "${{ github.event.before }}"
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -45,7 +49,7 @@ jobs:
           config_prod="false"
           config_stable="false"
 
-          # patterns to match config files
+          # pattern match config files
           config_pattern='^(k8s/helm-values/)'
           config_ignore='(.github|scripts|scripts-ext)'
 
@@ -162,7 +166,7 @@ jobs:
               prod_updated="true"
             fi
 
-            # Apply business rules for outputs
+            # Apply output rules
             if [[ "$preview" == "true" && "$preview_updated" == "true" ]]; then
               config_preview="true"
             fi
@@ -181,7 +185,7 @@ jobs:
           detect_config_env_changes "$github_base_ref" "$config_pattern" "$config_ignore"
 
 
-          # --- Output summary ---
+          # Output results
           echo "config_only=$config_only"
           echo "config_preview=$config_preview"
           echo "config_dev=$config_dev"
@@ -201,6 +205,51 @@ jobs:
             echo "unstable=$unstable"
             echo "stable=$stable"
           } >> "$GITHUB_OUTPUT"
+      - name: setup artifact tag outputs
+        id: setup-artifact-tags
+        env:
+          config_only: ${{ steps.control-flow.outputs.config_only }}
+          stable: ${{ steps.control-flow.outputs.stable }}
+          preview: ${{ steps.control-flow.outputs.preview }}
+          unstable: ${{ steps.control-flow.outputs.unstable }}
+        run: |
+          echo "==> Setting artifact tag outputs..."
+          set -x
+
+          set_artifact_tags() {
+            local config_only="$1"
+            local stable="$2"
+            local preview="$3"
+            local unstable="$4"
+
+            artifact_tag_dev=""
+            artifact_tag_prod=""
+            artifact_tag_preview=""
+
+            if [[ "$config_only" == "true" ]]; then
+              if [[ "$stable" == "true" ]]; then
+                artifact_tag_dev="<+variable.service_name_dev>"
+                artifact_tag_prod="<+variable.service_name_prod>"
+              elif [[ "$preview" == "true" ]]; then
+                artifact_tag_preview="<+variable.service_name_dev>"
+              elif [[ "$unstable" == "true" ]]; then
+                artifact_tag_dev="<+variable.service_name_dev>"
+              fi
+            fi
+
+            # Output results
+            echo "artifact_tag_dev=$artifact_tag_dev"
+            echo "artifact_tag_prod=$artifact_tag_prod"
+            echo "artifact_tag_preview=$artifact_tag_preview"
+
+            {
+              echo "artifact_tag_dev=$artifact_tag_dev"
+              echo "artifact_tag_prod=$artifact_tag_prod"
+              echo "artifact_tag_preview=$artifact_tag_preview"
+            } >> "$GITHUB_OUTPUT"
+          }
+
+          set_artifact_tags "$config_only" "$stable" "$preview" "$unstable"
 
   deploy-preview:
     runs-on: ubuntu-latest
