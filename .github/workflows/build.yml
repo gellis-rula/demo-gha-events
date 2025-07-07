@@ -97,7 +97,7 @@ jobs:
             local _files
             _files="$(git diff --name-only "${github_base_ref}" HEAD)"
             local files
-            files="$(grep -vE "$ignore" <<<"${FILES:-$_files}")"
+            files="$(grep -vE "$ignore" <<<"${FILES:-$_files}" || echo)"
 
             local changed_config="false"
             local changed_artifact="false"
@@ -135,7 +135,7 @@ jobs:
 
             local _files files
             _files="$(git diff --name-only "${github_base_ref}" HEAD)"
-            files="$(grep -vE "$config_ignore" <<<"${FILES:-$_files}")"
+            files="$(grep -vE "$config_ignore" <<<"${FILES:-$_files}" || echo)"
 
 
             config_only="$(config_only "$github_base_ref" "$config_pattern" "$config_ignore")"
