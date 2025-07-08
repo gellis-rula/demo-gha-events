@@ -78,7 +78,7 @@ jobs:
             fi
 
             if grep -q "^unstable$" <<<"$labels"; then
-                echo "Label 'preview' found. Setting unstable=true"
+                echo "Label 'unstable' found. Setting unstable=true"
                 unstable="true"
             fi
 
