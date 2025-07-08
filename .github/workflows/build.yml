@@ -90,7 +90,7 @@ jobs:
           check_noop(){
           # when no files changed, disable all flags
             local github_base_ref="$1"
-            local ignore="$3"
+            local ignore="$2"
 
             echo "Checking for noop condition against base ref: $github_base_ref"
             git fetch origin "$github_base_ref"
