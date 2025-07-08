@@ -241,6 +241,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
       - name: setup artifact tag outputs
         id: setup-artifact-tags
+        if: steps.control-flow.outputs.noop != 'true'
         env:
           config_only: ${{ steps.control-flow.outputs.config_only }}
           stable: ${{ steps.control-flow.outputs.stable }}
