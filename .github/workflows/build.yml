@@ -92,6 +92,7 @@ jobs:
             local github_base_ref="$1"
             local ignore="$3"
 
+            echo "Checking for noop condition against base ref: $github_base_ref"
             git fetch origin "$github_base_ref"
 
             local _files
