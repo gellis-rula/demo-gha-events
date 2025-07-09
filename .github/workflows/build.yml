@@ -55,46 +55,12 @@ jobs:
           config_pattern='^(k8s/helm-values/)'
           config_ignore='(.github|scripts|scripts-ext)'
 
-          # get base ref for main or PR
-          if [[ "${GITHUB_REF}" == "refs/heads/main" ]]; then
-
-            echo "On main branch."
-            echo "Setting stable=true"
-            stable="true"
-
-            echo "Setting base ref to $GITHUB_BEFORE"
-            github_base_ref="$GITHUB_BEFORE"
-
-          elif [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
-
-            echo "Pull request event"
-            labels=$(jq -r '.pull_request.labels[].name' "$GITHUB_EVENT_PATH")
-
-            # set preview=true only if 'preview' label exists and 'unstable' label does not
-            # unstable superscedes preview when both are present
-            if grep -q "^preview$" <<<"$labels" && ! grep -q "^unstable$" <<<"$labels"; then
-                echo "Label 'preview' found and 'unstable' label NOT found. Setting preview=true"
-                preview="true"
-            fi
-
-            if grep -q "^unstable$" <<<"$labels"; then
-                echo "Label 'unstable' found. Setting unstable=true"
-                unstable="true"
-            fi
-
-
-            echo "Setting base ref to ${{ github.base_ref }}"
-            github_base_ref=$(gh api repos/${{ github.repository }}/commits/${{ github.base_ref }} --jq '.sha')
-          fi
-
           check_noop(){
           # when no files changed, disable all flags
             local github_base_ref="$1"
             local ignore="$2"
 
             echo "Checking for noop condition against base ref: $github_base_ref"
-            git fetch origin "$github_base_ref"
-
             local _files
             _files="$(git diff --name-only "${github_base_ref}" HEAD)"
             local files
@@ -122,8 +88,7 @@ jobs:
             local pattern="$2"
             local ignore="$3"
 
-            git fetch origin "$github_base_ref"
-
+            echo "Checking for config only changes against base ref: $github_base_ref"
             local _files
             _files="$(git diff --name-only "${github_base_ref}" HEAD)"
             local files
@@ -160,8 +125,6 @@ jobs:
             local github_base_ref="$1"
             local pattern="$2"
             local ignore="$3"
-
-            git fetch origin "$github_base_ref"
 
             local _files files
             _files="$(git diff --name-only "${github_base_ref}" HEAD)"
@@ -211,6 +174,39 @@ jobs:
             fi
           }
 
+          #### start the work
+          # get base ref for main or PR
+          if [[ "${GITHUB_REF}" == "refs/heads/main" ]]; then
+            echo "On main branch."
+            echo "Setting stable=true"
+            stable="true"
+
+            echo "Setting base ref to $GITHUB_BEFORE"
+            github_base_ref="$GITHUB_BEFORE"
+
+          elif [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
+            echo "Pull request event"
+            labels=$(jq -r '.pull_request.labels[].name' "$GITHUB_EVENT_PATH")
+
+            # set preview=true only if 'preview' label exists and 'unstable' label does not
+            # unstable superscedes preview when both are present
+            if grep -q "^preview$" <<<"$labels" && ! grep -q "^unstable$" <<<"$labels"; then
+                echo "Label 'preview' found and 'unstable' label NOT found. Setting preview=true"
+                preview="true"
+            fi
+
+            if grep -q "^unstable$" <<<"$labels"; then
+                echo "Label 'unstable' found. Setting unstable=true"
+                unstable="true"
+            fi
+
+            echo "Setting base ref to ${{ github.base_ref }}"
+            github_base_ref=$(gh api repos/${{ github.repository }}/commits/${{ github.base_ref }} --jq '.sha')
+
+          fi
+
+          git fetch origin "$github_base_ref"
+
           check_noop "$github_base_ref" "$config_ignore"
           if [[ "$noop" == "false" ]]; then
             detect_config_env_changes "$github_base_ref" "$config_pattern" "$config_ignore"
@@ -239,6 +235,7 @@ jobs:
             echo "unstable=$unstable"
             echo "stable=$stable"
           } >> "$GITHUB_OUTPUT"
+
       - name: setup artifact tag outputs
         id: setup-artifact-tags
         if: steps.control-flow.outputs.noop != 'true'
@@ -332,7 +329,6 @@ jobs:
       pull-requests: write
     steps:
       - name: deploy-unstable
-        if: needs.setup-vars.outputs.unstable == 'true'
         run: |
           echo "Unstable is enabled"
           echo "Artifact tag for dev: ${{ needs.setup-vars.outputs.artifact_tag_dev }}"
@@ -376,7 +372,9 @@ jobs:
     needs: setup-vars
     if: needs.setup-vars.outputs.stable == 'true' &&
         needs.setup-vars.outputs.config_only == 'true' &&
-        needs.setup-vars.outputs.config_dev == 'true'
+        needs.setup-vars.outputs.config_dev == 'true' &&
+        needs.setup-vars.outputs.config_stable != 'true'
+
     steps:
       - name: deploy-dev
         run: |
@@ -388,7 +386,8 @@ jobs:
     needs: setup-vars
     if: needs.setup-vars.outputs.stable == 'true' &&
         needs.setup-vars.outputs.config_only == 'true' &&
-        needs.setup-vars.outputs.config_prod == 'true'
+        needs.setup-vars.outputs.config_prod == 'true' &&
+        needs.setup-vars.outputs.config_stable != 'true'
     steps:
       - name: deploy-prod
         run: |
