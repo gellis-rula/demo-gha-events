@@ -88,7 +88,8 @@ jobs:
             local pattern="$2"
             local ignore="$3"
 
-            echo "Checking for config only changes against base ref: $github_base_ref"
+            echo "Checking for config only changes against base ref: $github_base_ref" >&2
+
             local _files
             _files="$(git diff --name-only "${github_base_ref}" HEAD)"
             local files
@@ -214,6 +215,8 @@ jobs:
 
 
           # Output results
+          set +x
+          echo "==> Control flow outputs:"
           echo "noop=$noop"
           echo "config_only=$config_only"
           echo "config_preview=$config_preview"
