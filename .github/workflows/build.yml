@@ -1,5 +1,6 @@
 name: gha event demo
 
+
 on:
   push:
     branches:
@@ -38,7 +39,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "==> Setting variables from github event context..."
-          set -x
+
           # initialize flags
           noop="false"
           unstable="false"
@@ -189,7 +190,7 @@ jobs:
             echo "Pull request event"
             labels=$(jq -r '.pull_request.labels[].name' "$GITHUB_EVENT_PATH")
 
-            # set preview=true only if 'preview' label exists and 'unstable' label does not
+            # set preview=true only when 'preview' label exists and 'unstable' label does not
             # unstable superscedes preview when both are present
             if grep -q "^preview$" <<<"$labels" && ! grep -q "^unstable$" <<<"$labels"; then
                 echo "Label 'preview' found and 'unstable' label NOT found. Setting preview=true"
@@ -260,6 +261,8 @@ jobs:
             artifact_tag_dev=""
             artifact_tag_prod=""
             artifact_tag_preview=""
+            harness_trigger_json=""
+ 
 
             if [[ "$config_only" == "true" ]]; then
               if [[ "$stable" == "true" ]]; then
@@ -272,15 +275,25 @@ jobs:
               fi
             fi
 
+              harness_trigger_json=$(jq -n \
+                --arg tag_dev "$artifact_tag_dev" \
+                --arg tag_prod "$artifact_tag_prod" \
+                '{tag_dev: $tag_dev, tag_prod: $tag_prod}')
+
             # Output results
+            echo "==> artifact tag outputs:"
             echo "artifact_tag_dev=$artifact_tag_dev"
             echo "artifact_tag_prod=$artifact_tag_prod"
             echo "artifact_tag_preview=$artifact_tag_preview"
+            echo "harness_trigger_json=$harness_trigger_json"
+
+
 
             {
               echo "artifact_tag_dev=$artifact_tag_dev"
               echo "artifact_tag_prod=$artifact_tag_prod"
               echo "artifact_tag_preview=$artifact_tag_preview"
+              echo "harness_trigger_json=$harness_trigger_json"
             } >> "$GITHUB_OUTPUT"
           }
 
