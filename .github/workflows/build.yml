@@ -12,7 +12,6 @@ on:
       - opened
       - synchronize
       - labeled
-
 jobs:
   setup-vars:
     runs-on: ubuntu-latest
@@ -275,6 +274,10 @@ jobs:
               fi
             fi
 
+              harness_trigger_json=$(jq -c -n \
+                --arg tag_dev "$artifact_tag_dev" \
+                --arg tag_prod "$artifact_tag_prod" \
+                '{tag_dev: $tag_dev, tag_prod: $tag_prod}')
 
             # Output results
             echo "==> artifact tag outputs:"
