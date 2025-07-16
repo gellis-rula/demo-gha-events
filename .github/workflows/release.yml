@@ -5,43 +5,57 @@ on:
     tags:
       - 'v*'    # Only on version tags
 
+permissions:
+  contents: write
+
 jobs:
-  build-and-release:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
+  release:
+    uses: ./.github/workflows/go-build.yml
+    with:
+      binary-name: demo
+      working-directory: src
+      publish-to-release: 'true'
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
 
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.24'
 
-      - name: Get version tag
-        id: get_tag
-        run: echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
 
-      - name: download go dependencies
-        run: |
-          go mod tidy
-          go mod download
-        working-directory: src
+#jobs:
+#  build-and-release:
+#    runs-on: ubuntu-latest
+#    permissions:
+#      contents: write
 
-      - name: Build Go package
-        run: |
-          mkdir -p dist
-          GOOS=linux   GOARCH=amd64  go build -o dist/demo_linux-amd64
-          GOOS=linux   GOARCH=arm64  go build -o dist/demo_linux-arm64
-          GOOS=darwin  GOARCH=arm64  go build -o dist/demo_darwin-arm64
-          go build -o dist/demo
-        working-directory: src
+#    steps:
+#      - name: Checkout code
+#        uses: actions/checkout@v4
 
-      - name: Upload binary to release
-        run: |
-          gh release upload ${{ steps.get_tag.outputs.TAG }}  dist/* --clobber
-        working-directory: src
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+#      - name: Set up Go
+#        uses: actions/setup-go@v5
+#        with:
+#          go-version: '1.24'
+
+#      - name: Get version tag
+#        id: get_tag
+#        run: echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+#      - name: download go dependencies
+#        run: |
+#          go mod tidy
+#          go mod download
+#        working-directory: src
+#
+#      - name: Build Go package
+#        run: |
+#          mkdir -p dist
+#          GOOS=linux   GOARCH=amd64  go build -o dist/demo_linux-amd64
+#          GOOS=linux   GOARCH=arm64  go build -o dist/demo_linux-arm64
+#          GOOS=darwin  GOARCH=arm64  go build -o dist/demo_darwin-arm64
+#          go build -o dist/demo
+#        working-directory: src
+#
+#      - name: Upload binary to release
+#        run: |
+#          gh release upload ${{ steps.get_tag.outputs.TAG }}  dist/* --clobber
+#        working-directory: src
+#        env:
+#          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
