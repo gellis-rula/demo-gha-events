@@ -1,0 +1,87 @@
+name: Reusable Go Release
+
+on:
+  workflow_call:
+    inputs:
+      go-version:
+        description: 'Go version to use'
+        required: false
+        default: '1.24'
+        type: string
+      working-directory:
+        description: 'Working directory with Go code'
+        required: false
+        default: '.'
+        type: string
+      binary-name:
+        description: 'Base name of the output binary'
+        required: true
+        type: string
+      build-matrix:
+        description: 'JSON array of GOOS/GOARCH objects (platforms to build for)'
+        required: false
+        default: |
+          [
+            {"goos":"linux", "goarch":"amd64"},
+            {"goos":"linux", "goarch":"arm64"},
+            {"goos":"darwin", "goarch":"arm64"}
+          ]
+        type: string
+      go-build-flags:
+        description: 'Extra flags to pass to go build'
+        required: false
+        default: ''
+        type: string
+      publish-to-release:
+        description: 'Upload built binaries to GitHub Release'
+        required: false
+        default: 'true'
+        type: string
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    strategy:
+      matrix:
+        include: ${{ fromJson(inputs.build-matrix) }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ inputs.go-version }}
+
+      - id: get_tag
+        if: startsWith(github.ref, 'refs/tags/')
+        run: echo "TAG=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+
+      - name: Download dependencies
+        run: |
+          go mod tidy
+          go mod download
+        working-directory: ${{ inputs.working-directory }}
+
+      - name: Build Go binary
+        run: |
+          mkdir -p dist
+          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -o dist/${{ inputs.binary-name }}_${{ matrix.goos }}-${{ matrix.goarch }} ${{ inputs.go-build-flags }}
+        working-directory: ${{ inputs.working-directory }}
+
+      - name: Upload binary as workflow artifact
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.binary-name }}-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: ${{ inputs.working-directory }}/dist/${{ inputs.binary-name }}-${{ matrix.goos }}-${{ matrix.goarch }}
+
+      - name: Upload binary to release
+        if: ${{ inputs.publish-to-release == 'true' && startsWith(github.ref, 'refs/tags/') }}
+        run: |
+          gh release upload ${{ steps.get_tag.outputs.TAG }} dist/${{ inputs.binary-name }}_${{ matrix.goos }}-${{ matrix.goarch }} --clobber
+        working-directory: ${{ inputs.working-directory }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
