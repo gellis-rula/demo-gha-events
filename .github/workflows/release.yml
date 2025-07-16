@@ -24,6 +24,10 @@ jobs:
         id: get_tag
         run: echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
 
+      - name: download go dependencies
+        run: go mod download
+        working-directory: src
+
       - name: Build Go package
         run: |
           mkdir -p dist
