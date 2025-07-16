@@ -1,0 +1,33 @@
+name: Go Release with GH CLI
+
+on:
+  push:
+    tags:
+      - 'v*'    # Only on version tags
+    paths:
+      - 'src/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - '.github/**'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    strategy:
+      matrix:
+        project:
+          - binary-name: app1
+            working-directory: src/app1
+          - binary-name: app2
+            working-directory: src/app2
+    uses: ./.github/workflows/go-builder.yml
+    with:
+      binary-name: ${{ matrix.project.binary-name }}
+      working-directory: ${{ matrix.project.working-directory }}
+      go-version: '1.24'
+      publish-to-release: 'true'
+      publish-to-pull-request: 'true'
