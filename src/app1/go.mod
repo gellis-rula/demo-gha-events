@@ -1,4 +1,4 @@
-module github.com/gellis-rula/demo-gha-events
+module github.com/gellis-rula/demo-gha-events-app1
 
 go 1.23.6
 
